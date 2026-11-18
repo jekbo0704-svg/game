@@ -1,0 +1,113 @@
+rules_version = '2';
+
+// Қазақ даласының қорғаны — Firestore қауіпсіздік ережелері.
+// Барлық тексеру СЕРВЕРДЕ жүреді: браузердегі кодты өзгерткенмен, бұл ережелерді айналып өту мүмкін емес.
+//
+//  users/{uid}        — ойыншының профилі, прогресі, жалпы статистикасы (тек өзі және админ көреді)
+//  runs/{id}          — әр ойынның нәтижесі (тек өзі және админ көреді, өзгертуге болмайды)
+//  leaderboard/{uid}  — ортақ рейтинг (тек аты, ұпайы, деңгейі; email жоқ)
+//  admins/{email}     — админдер тізімі (тек Firebase Console арқылы қосылады)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn() && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/admins/$(myEmail()));
+    }
+    function intIn(v, lo, hi) { return v is int && v >= lo && v <= hi; }
+    function validName(n) { return n is string && n.size() > 0 && n.size() <= 40; }
+    function userAfter() { return getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+
+    // ---------- админдер ----------
+    match /admins/{mail} {
+      allow get: if signedIn() && myEmail() == mail;     // әркім тек өзін тексере алады
+      allow list, write: if false;
+    }
+
+    // ---------- профиль ----------
+    match /users/{uid} {
+      function validProgress(p) {
+        return p is map && intIn(p.maxCleared, 0, 10)
+          && p.stars is map && p.fails is map && p.blessing is map;
+      }
+      // rate limit: нәтиже (lastRun) 10 секундта бір реттен жиі жазылмайды
+      function runRateOk() {
+        let d = request.resource.data.diff(resource.data).affectedKeys();
+        return !d.hasAny(['lastRun', 'totals']) || (
+          request.resource.data.lastRun == request.time
+          && (isAdmin() || !('lastRun' in resource.data) || request.time > resource.data.lastRun + duration.value(10, 's'))
+          && request.resource.data.totals.games == resource.data.totals.games + 1
+          && intIn(request.resource.data.totals.correct - resource.data.totals.correct, 0, 100)
+          && intIn(request.resource.data.totals.wrong - resource.data.totals.wrong, 0, 100)
+          && intIn(request.resource.data.totals.timeSec - resource.data.totals.timeSec, 0, 7200));
+      }
+
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'progress', 'wrong', 'totals', 'createdAt', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.email == myEmail()
+        && validProgress(request.resource.data.progress) && request.resource.data.progress.maxCleared == 0
+        && request.resource.data.wrong is map
+        && request.resource.data.totals == { 'games': 0, 'correct': 0, 'wrong': 0, 'timeSec': 0 };
+      allow update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'progress', 'wrong', 'totals', 'lastRun', 'createdAt', 'updatedAt'])
+        && request.resource.data.email == resource.data.email
+        && validName(request.resource.data.name)
+        && validProgress(request.resource.data.progress)
+        // кезеңдерді секіріп өтуге болмайды: бір жазуда ең көбі +1 кезең
+        && (isAdmin() || request.resource.data.progress.maxCleared <= resource.data.progress.maxCleared + 1)
+        && request.resource.data.wrong is map && request.resource.data.wrong.size() <= 1000
+        && runRateOk();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- әр ойынның нәтижесі ----------
+    match /runs/{id} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'hero', 'stage', 'result', 'score', 'kills', 'level',
+                                                 'correct', 'wrong', 'timeSec', 'helpUsed', 'test', 'date'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == myEmail()
+        && validName(request.resource.data.name)
+        && request.resource.data.hero is string && request.resource.data.hero.size() <= 40
+        && intIn(request.resource.data.stage, 1, 10)
+        && request.resource.data.result in ['win', 'lose']
+        // ұпай шегі: кезең нөміріне қарай (ең көбі 25 000 × кезең)
+        && intIn(request.resource.data.score, 0, request.resource.data.stage * 25000)
+        && intIn(request.resource.data.kills, 0, 20000)
+        && intIn(request.resource.data.level, 1, 300)
+        && intIn(request.resource.data.correct, 0, 100)
+        && intIn(request.resource.data.wrong, 0, 100)
+        && intIn(request.resource.data.timeSec, 0, 7200)
+        && intIn(request.resource.data.helpUsed, 0, 3)
+        && request.resource.data.test is bool
+        && request.resource.data.date == request.time
+        // нәтиже тек профильдің rate limit тексерісінен өткен жазуымен бірге сақталады
+        && userAfter().lastRun == request.time;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- рейтинг ----------
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'score', 'level', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.name == userAfter().name
+        && intIn(request.resource.data.score, 0, 250000)
+        && (resource == null || request.resource.data.score >= resource.data.score)   // ұпай тек өседі
+        && intIn(request.resource.data.level, 0, 10)
+        && request.resource.data.level <= userAfter().progress.maxCleared
+        && request.resource.data.updatedAt == request.time
+        && userAfter().lastRun == request.time;          // тек жаңа ойын нәтижесімен бірге
+      allow delete: if isAdmin();
+    }
+  }
+}

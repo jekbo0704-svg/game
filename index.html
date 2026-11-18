@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Қазақ даласының қорғаны</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-root"></div>
+
+  <!-- Ойын HUD -->
+  <div id="xpbar" hidden><i id="xp-fill"></i></div>
+  <div id="hud" hidden>
+    <div class="hud-l"><span id="h-stage"></span><span id="h-hearts" aria-label="Жан"></span><span id="h-god" class="god-badge" hidden>GOD</span></div>
+    <div class="hud-c"><b id="h-timer">2:30</b><span>Ұпай <b id="h-score">0</b></span></div>
+    <div class="hud-r"><span>Деңгей <b id="h-lvl">1</b></span><span>Жау <b id="h-kills">0</b></span><span>Артефакт <b id="h-art">0/3</b></span><span>Көмек <b id="h-help">0/3</b></span><button id="h-pause" aria-label="Пауза">‖</button></div>
+  </div>
+  <div id="zonebar" hidden></div>
+  <div id="poison" hidden></div>
+  <div id="bossbar" hidden><span id="boss-name"></span><div class="track"><i id="boss-fill"></i></div></div>
+  <div id="wlist" hidden></div>
+  <canvas id="minimap" width="168" height="112" hidden></canvas>
+  <button id="ability-btn" hidden><span id="ability-fill"></span><b id="ability-name"></b><small id="ability-cd">Пробел</small></button>
+
+  <div id="screen"></div>
+  <div id="toasts"></div>
+  <div id="modal" hidden></div>
+  <aside id="admin" hidden></aside>
+
+  <!-- Логотип: 5 рет басса → админ PIN -->
+  <button id="logo" aria-label="Қазақ даласының қорғаны">
+    <svg viewBox="0 0 38 38" width="34" height="34" aria-hidden="true">
+      <circle cx="19" cy="19" r="17" fill="none" stroke="#E2B24F" stroke-width="2.4"/>
+      <path d="M19 6 L22 16 L32 19 L22 22 L19 32 L16 22 L6 19 L16 16 Z" fill="#E2B24F"/>
+      <circle cx="19" cy="19" r="3.2" fill="#14202a"/>
+    </svg>
+  </button>
+
+  <!-- Дыбыс: басу немесе M пернесі — өшіру/қосу -->
+  <button id="sound" aria-label="Дыбыс">🔊</button>
+
+  <!-- Firebase: тек Firebase Hosting-те жүктеледі (баптаулар /__/firebase/init.js ішінде, GitHub-та жоқ).
+       Компьютерде файл ретінде ашқанда бұл жолдар жүктелмейді — ойын демо режимде жұмыс істейді. -->
+  <script src="/__/firebase/10.14.1/firebase-app-compat.js"></script>
+  <script src="/__/firebase/10.14.1/firebase-auth-compat.js"></script>
+  <script src="/__/firebase/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="lib/phaser.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/questions.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

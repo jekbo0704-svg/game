@@ -1,0 +1,11 @@
+# Firebase кэші мен логтары
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+*.log
+# құпия файлдар ешқашан GitHub-қа түспеуі керек
+.env
+.env.*
+*.key
+serviceAccount*.json
+node_modules/

@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "hkz101-qorgan",
+    "hkz101-qorgan": "hkz101-qorgan"
+  },
+  "targets": {},
+  "etags": {}
+}
